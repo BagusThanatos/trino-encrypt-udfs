@@ -13,26 +13,43 @@
  */
 package com.starburstdata.udfs.encrypt;
 
-import io.trino.operator.scalar.AbstractTestFunctions;
+import io.trino.metadata.InternalFunctionBundle;
+import io.trino.sql.query.QueryAssertions;
+import org.junit.jupiter.api.parallel.Execution;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static io.trino.spi.type.VarcharType.VARCHAR;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.parallel.ExecutionMode.CONCURRENT;
 
+@Execution(CONCURRENT)
 public class TestEncrypt
-        extends AbstractTestFunctions
 {
+    private QueryAssertions assertions;
+
     @BeforeClass
     public void setUp()
-            throws Exception
     {
-        registerScalar(EncryptDecrypt.class);
+        assertions = new QueryAssertions();
+        assertions.addFunctions(InternalFunctionBundle.builder()
+                .scalars(EncryptDecrypt.class)
+                .build());
+    }
+
+    @AfterClass(alwaysRun = true)
+    public final void destroyTestFunctions()
+    {
+        assertions.close();
+        assertions = null;
     }
 
     @Test
     public void testEncrypt()
     {
-        assertFunction("encrypt('myvalue','mypassword')", VARCHAR, "/stEnUn+cUs=");
-        assertFunction("decrypt('/stEnUn+cUs=','mypassword')", VARCHAR, "myvalue");
+        assertThat(assertions.expression("encrypt('myvalue','mypassword')"))
+                .isEqualTo("/stEnUn+cUs=");
+        assertThat(assertions.expression("decrypt('/stEnUn+cUs=','mypassword')"))
+                .isEqualTo("myvalue");
     }
 }
